@@ -1,5 +1,5 @@
 ---
-title: "Homework"
+title: "Homework-05"
 format: 
   html:
     toc: true
@@ -29,10 +29,33 @@ library(GGally)
 library(dplyr)
 library(ggplot2)
 library(performance)
+library(MuMIn)
+```
+
+summary Sarracenia are carnivorous plants
+
+```{r}
+#dev.off()
+#dev.new()
 ```
 
 
-Read in the data 
+```{r}
+colnames(plant_og)
+```
+
+
+
+```{r}
+plant_og <- read_csv(here("data", "knb-lter-hfr.109.18","hf109-01-sarracenia.csv"))
+```
+
+```{r}
+View(plant_og)
+```
+
+Read in the data
+
 ```{r}
 plant <- read_csv(here("data", "knb-lter-hfr.109.18","hf109-01-sarracenia.csv")) %>% 
   #make the column names cleaner
@@ -43,22 +66,21 @@ View(plant)
 
 ```
 
-Viewing missing data 
+Viewing missing data
+
 ```{r}
 gg_miss_var(plant)
 ```
 
-subsetting the data by dropping the NAs: 
+subsetting the data by dropping the NAs:
+
 ```{r subset-drop-NA}
 plant_subset <- plant %>%  
   drop_na(sla, chlorophyll, amass, num_lvs, num_phylls)
 View(plant_subset)
 ```
 
-Create a correlation plot: 
-(active voice)
-(example writing) To determine the realtionships between numerical variables in our dataset,  we calculated Pearsons r and visually represented correlation using a correation plot.
-
+Create a correlation plot: (active voice) (example writing) To determine the relationships between numerical variables in our data set, we calculated Pearson r and visually represented correlation using a correlation plot.
 
 ```{r}
 #calculate Pearson's r for numerical values only
@@ -74,25 +96,36 @@ corrplot(plant_cor,
          method = "ellipse",
          addCoef.col = "black"
          )
+#remember 
 ```
 
-Create a plot of each variable compared against the others 
+Create a plot of each variable compared against the others
+
 ```{r paris-plot}
 plant_subset %>% 
+  
   select(species:num_phylls) %>% 
+  
   ggpairs()
 ```
 
-Starting regression here: 
-(example) To determine how species and physiological characteristics predict biomass, we fit multiple linear models. 
+Figure.
+
+pearsons corrlation \*\* also means its signficant
+
+density plant is the line thing, scatter plot shit
+
+Starting regression here: (example) To determine how species and physiological characteristics predict biomass, we fit multiple linear models.
 
 ```{r null-and-full-model}
+# Begining Regression 
 null <- lm(totmass ~ 1, data = plant_subset) 
+
 full <- lm(totmass ~ species + feedlevel + sla + chlorophyll + amass + num_lvs + num_phylls, 
            data = plant_subset)
 ```
 
-We visually assess normality and homoskedasticity of residuals using diganostic plots for the full model: 
+We visually assess normality and homoskedasticity of residuals using diganostic plots for the full model:
 
 ```{r full-diagnostics}
 par(mfrow = c(2,2))
@@ -102,31 +135,229 @@ plot(full)
 
 We also tested for normality using the Shapiro-Wilk test (null hypothesis: variable of interest (i.e the residuals) are normally distributed)
 
-[got from the help page-kyle] We tested for heteroskedasticity using the Breusch-Pagan test (null hypothesis: variable of interest has constant variance).
+\[got from the help page-kyle\] We tested for heteroskedasticity using the Breusch-Pagan test (null hypothesis: variable of interest has constant variance).
+
 ```{r}
+#not going to say we used "check_normaility" but going to explain it, so by using the help function tab we are going to say what we did. 
 check_normality(full)
 
 check_heteroscedasticity(full)
 ```
 
-
 ```{r}
-full_log <- lm(log(totmass) ~ species + feedlevel + sla + chlorophyll + amass + num_lvs + num_phylls,  data = plant_subset)
+#changed the whole process using the log. 
+#all on a log scale, it is easier to find the slope
+
+null_log <- lm(log(totmass)~1, data = plant_subset) #this is the null 
+
+full_log <- lm(log(totmass) ~ species + feedlevel + sla + chlorophyll + amass + num_lvs + num_phylls,  
+data = plant_subset) 
 
 plot(full_log)
+
+plot(null_log)
+
 check_normality(full_log)
+#OK: residuals appear as normally distributed (p = 0.107)
+
 check_heteroscedasticity(full_log)
+#OK: Error variance appears to be homoscedastic (p = 0.071)
+
+
 ```
 
+ANOVA
+
+```{r ANOVA-is-not-in-homework}
+#for anova there is type 1, type 2, type 3 
+```
+
+Evaluate multicollinearity:
+
+intercorrelation between predictor variables in regression, checking for any correlation between the predictor variables
+
+```{r calculate-vif}
+#looking for something more than 5, 
+#car() looks for categorical predictors / uses categorical predictors 
+
+car::vif(full_log)
+#after seeing it NO?, so none of them are inflating the R-squared values, if have a bunch of predictors that are related with eachother, that bumps up the r-squared, makes it very complicated. 
+```
+
+We evaluated mutlicollineearity by calculating generalized variance inflation factor and determined that..... (this model did not display based on the ????)
+
+try some more models:
+
+addressing the question: what set of predictor variables best explains the response?
+
+```{r}
+#have to decide which one that maximizes the amount of variances but minimizes the complexity, that's why with plants, you have to know the biological decisions that impact biomass, in homework have to explain biologically 
+
+model2_log <- lm(log(totmass) ~species, data = plant_subset)
+
+```
+
+```{r}
+plot(model2_log)
+
+check_normality(model2_log) #OK: residuals appear as normally distributed (p = 0.374).
+
+check_heteroscedasticity(model2_log) #OK: Error variance appears to be homoscedastic (p = 0.100).
+
+#reason the look like this is because predictor is catogorical 
+```
+
+```{r}
+model3_log <- lm(log(totmass) ~feedlevel, data = plant_subset)
+
+plot(model3_log)
+
+check_normality(model3_log) # Warning:Non-normality of residuals detected (p = 0.018)
+
+check_heteroscedasticity(model3_log) #OK: Error variance appears to be homoscedastic (p = 0.261)
+
+```
+
+```{r}
+model4_log <- lm(log(totmass) ~sla, data = plant_subset)
+
+plot(model4_log)
+
+check_normality(model4_log) #Warning: Non-normality of residuals detected (p = 0.002).
+
+check_heteroscedasticity(model4_log) #Warning: Heteroscedasticity (non-constant error variance) detected (p = 0.031).
+
+```
+
+```{r}
+
+model5_log <- lm(log(totmass) ~chlorophyll, data = plant_subset)
+
+plot(model5_log)
+
+check_normality(model5_log)#Warning: Non-normality of residuals detected (p = 0.002).
+
+check_heteroscedasticity(model5_log)#OK: Error variance appears to be homoscedastic (p = 0.546).
+```
+
+```{r}
+model6_log <- lm(log(totmass) ~amass, data = plant_subset)
+
+plot(model6_log)
+
+check_normality(model6_log)#Warning: Non-normality of residuals detected (p = 0.002).
+
+check_heteroscedasticity(model6_log)#OK: Error variance appears to be homoscedastic (p = 0.628).
+```
+
+```{r}
+model7_log <- lm(log(totmass) ~num_lvs, data = plant_subset)
+
+plot(model7_log)
+
+#check_normality(model7_log) #Warning: Non-normality of residuals detected (p = 0.002).
+
+#check_heteroscedasticity(model7_log) #OK: Error variance appears to be homoscedastic (p = 0.370).
+
+```
+
+```{r}
+#using predictor num_phylls
+model8_log <- lm(log(totmass) ~num_phylls, data = plant_subset)
+
+plot(model8_log)
+
+#check_normality(model8_log) #Warning: Non-normality of residuals detected (p = 0.028).
+
+#check_heteroscedasticity(model8_log) #OK: Error variance appears to be homoscedastic (p = 0.138).
+```
+
+------------------------------------------------------------------------
+
+compare models using Akaike's Information Criterion (AIC) values: #remeber AIC value, looks for the simplist model that looks for the most variance
+
+```{r}
+# can use AICc OR MumM
+
+#so what model can be best predicted and is the least compelx 
+AICc(full_log) #133.94, someone in class said the full_log, cuz it has the lowest
+AICc(model2_log)#157.575
+AICc(null_log)#305.0028
+# for homework going to be working with two additional models that make sense biologically 
+```
+
+```{r}
+MuMIn::AICc(full_log, null_log, model2_log, model3_log, model4_log, model5_log, model6_log, model7_log, model8_log)
+```
+
+The AICc is is a metric to figure out what linear model is the best.
+
+We found that the \_\_\_\_\_ model, including \_\_ \_\_ \_\_ predictors best predicted \_\_\_\_\_ (model summary).
+
+```{r}
+#install.packages("MuMIn")
+#cant run, error in loadNAMESPACE, GOT IT 
+MuMIn::AICc(full_log, model2_log, null_log)
+#MuMIn::midek.sel(full_log, model2_log, null_log)
+```
+
+We compare models using AIC and chose the model with the lowest value, which was..
+
+#results
+
+We found that the \_\_\_\_\_ model, including \_\_ \_\_ \_\_ predictors best predicted \_\_\_\_\_ (model summary). #include it all, alpha, p-value
+
+```{r}
+summary(full_log)
+
+
+table <- tidy(full_log, conf.int = TRUE) %>% 
+  #change the p-value number if they're really small 
+  #change the estamtes, standard error, and t-tstastics to round to ___ digits 
+  #using mutate 
+  #make it into a flextable
+  flextable() %>% 
+  
+  autofit()
+
+```
+
+use "ggpredict()" to backtransform estimates
+
+```{r}
+# means you have tested hypothesis to a log response, have to be transparent to a log transformation though
+library(ggplot2)
+#have to say results are reported on a log ___
+model_pred <- ggpredict(full_log, terms = "species", back.transform = TRUE)
 
 
 
 
+#exploring 
+
+#plot(model_pred, add.data = TRUE), this is wrong 
+
+
+plot(ggpredict(full_log, terms = "species", 
+back.transform = TRUE),add.data = TRUE)#same way but getting error 
 
 
 
+plot(ggpredict(full_log, terms = "chlorophyll", 
+back.transform = TRUE),add.data = TRUE)
+
+plot(ggpredict(full_log, terms = "sla", 
+back.transform = TRUE),add.data = TRUE)
+
+model_pred
+#after looking at it, all else held constant, cosntant, constant, constant, expect total biomass of each species, o
+```
+
+```{r}
 
 
+```
 
+```{r}
 
-
+```

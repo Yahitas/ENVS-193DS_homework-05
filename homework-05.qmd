@@ -1,0 +1,266 @@
+---
+title: "Homework 5"
+format: 
+  html:
+    toc: true
+    toc-location: left
+    code-fold: true 
+    theme: yeti 
+editor: visual
+execute: 
+  message: false 
+  warning: false 
+---
+
+## How do Sarracenia characteristics predict biomass??
+
+## Introduction
+
+Sarracenia is a carnvirous plant.
+
+Eats insects
+
+To predict individual biomass from morphological, physiological and taxonomic characterstics
+
+rhizomatous & perennial
+
+## Methods
+
+```{r, libraries, include = FALSE}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggeffects)
+library(naniar)
+library(flextable)
+library(car)
+library(broom)
+library(corrplot)
+library(AICcmodavg)
+library(GGally)
+library(dplyr)
+library(ggplot2)
+library(performance)
+```
+
+### Importing data
+
+```{r}
+plant_og <- read_csv(here("data", "knb-lter-hfr.109.18","hf109-01-sarracenia.csv"))
+View(plant_og)
+```
+
+```{r}
+plant <- read_csv(here("data", "knb-lter-hfr.109.18","hf109-01-sarracenia.csv")) %>% 
+  #make the column names cleaner
+  clean_names() %>% 
+  #from tidyverse, selecting the columns of interest 
+  select(totmass, species, feedlevel, sla, chlorophyll, amass, num_lvs, num_phylls)
+```
+
+### Viewing missing data
+
+```{r, fig.width=8, fig.height=5, out.width="90%"}
+gg_miss_var(plant)
+```
+
+```{r subset-drop-NA}
+#subsetting the data by dropping the NAs: 
+
+plant_subset <- plant %>%  
+  #dropping the value of zero in the columns below
+  drop_na(sla, chlorophyll, amass, num_lvs, num_phylls)
+#View(plant_subset)
+```
+
+### Pearsons Plot
+
+```{r, fig.width=8, fig.height=5, out.width="90%"}
+#calculate Pearson's r for numerical values only
+
+plant_cor <- plant_subset %>% 
+  #selecting all the columns between feedlevel:num_phylls
+  
+  select(feedlevel:num_phylls) %>% 
+  
+  cor(method = "pearson")
+#View(plant_cor)
+########
+#creating a correlation plot 
+corrplot(plant_cor, 
+         #change the shape of what's in the cells 
+         method = "ellipse",
+         addCoef.col = "black"
+         )
+```
+
+The plot above is lit
+
+### Relationship between variables (not correlation)
+
+A plot of each variable compared against other variables
+
+```{r paris-plot, fig.width=8, fig.height=5, out.width="90%"}
+plant_subset %>% 
+  select(species:num_phylls) %>% 
+  ggpairs()
+```
+
+The plot above is cool
+
+### Creating null and full model
+
+(example) To determine how species and physiological characteristics predict biomass, we fit multiple linear models. Begining Linear Regression
+
+```{r null-and-full-model}
+null <- lm(totmass ~ 1, data = plant_subset) 
+full <- lm(totmass ~ species + feedlevel + sla + chlorophyll + amass + num_lvs + num_phylls, 
+           data = plant_subset)
+```
+
+We visually assess normality and homoskedasticity of residuals using diganostic plots for the full model:
+
+```{r full-diagnostics, fig.width=8, fig.height=5, out.width="90%"}
+par(mfrow = c(2,2))
+plot(full)
+#the normality looks pretty good, the homoskedasticity (look at the residuals vs fitted plot), the red line is pretty flat and the residuals are spread out are randomly distributed at the end but are clumped at the beginning, THUS they are heterskedasticity because its not constantly the same thing!
+```
+
+We also tested for normality using the Shapiro-Wilk test (null hypothesis: variable of interest (i.e the residuals) are normally distributed)
+
+\[got from the help page-kyle\] We tested for heteroskedasticity using the Breusch-Pagan test (null hypothesis: variable of interest has constant variance).
+
+```{r}
+null_log <- lm(log(totmass)~1, data = plant_subset) #this is the null 
+
+full_log <- lm(log(totmass) ~ species + feedlevel + sla + chlorophyll + amass + num_lvs + num_phylls,  
+data = plant_subset)
+```
+
+### Visual and stastical assumption checks for the full model
+
+```{r}
+#not going to say we used "check_normaility" but going to explain it, so by using the help function tab we are going to say what we did. 
+check_normality(full_log)
+#OK: residuals appear as normally distributed (p = 0.107)
+
+check_heteroscedasticity(full_log)
+#OK: Error variance appears to be homoscedastic (p = 0.071)
+```
+
+```{r}
+#changed the whole process using the log. 
+plot(full_log)
+check_normality(full_log)
+check_heteroscedasticity(full_log)
+
+#all on a log scale, it is easier to find the slope
+
+```
+
+### Variance inflation tracker 
+
+```{r calculate-vif}
+#looking for something more than 5, 
+#car() looks for categorical predictors / uses categorical predictors 
+
+car::vif(full_log)
+
+#after seeing it NO?, so none of them are inflating the R-squared values, if have a bunch of predictors that are related with eachother, that bumps up the r-squared, makes it very complicated. 
+```
+
+We evaluated mutlicollineearity by calculating generalized variance inflation factor and determined that..... (this model did not display based on the ????)
+
+try some more models:
+
+addressing the question: what set of predictor variables best explains the response?
+
+## deciding what bio column to use
+
+### Model construction 
+
+```{r}
+#have to decide which one that maximizes the amount of variances but minimizes the complexity, that's why with plants, you have to know the biological decisions that impact biomass, in homework have to explain biologically 
+
+model2_log <- lm(log(totmass) ~species, data = plant_subset)
+
+```
+
+```{r}
+model3_log <- lm(log(totmass) ~feedlevel, data = plant_subset)
+
+plot(model3_log)
+
+check_normality(model3_log) # Warning:Non-normality of residuals detected (p = 0.018)
+
+check_heteroscedasticity(model3_log) #OK: Error variance appears to be homoscedastic (p = 0.261)
+
+```
+
+```{r}
+model4_log <- lm(log(totmass) ~sla, data = plant_subset)
+
+plot(model4_log)
+
+check_normality(model4_log) #Warning: Non-normality of residuals detected (p = 0.002).
+
+check_heteroscedasticity(model4_log) #Warning: Heteroscedasticity (non-constant error variance) detected (p = 0.031).
+
+```
+
+```{r}
+
+model5_log <- lm(log(totmass) ~chlorophyll, data = plant_subset)
+
+plot(model5_log)
+
+check_normality(model5_log)#Warning: Non-normality of residuals detected (p = 0.002).
+
+check_heteroscedasticity(model5_log)#OK: Error variance appears to be homoscedastic (p = 0.546).
+```
+
+```{r}
+model6_log <- lm(log(totmass) ~amass, data = plant_subset)
+
+plot(model6_log)
+
+check_normality(model6_log)#Warning: Non-normality of residuals detected (p = 0.002).
+
+check_heteroscedasticity(model6_log)#OK: Error variance appears to be homoscedastic (p = 0.628).
+```
+
+```{r}
+model7_log <- lm(log(totmass) ~num_lvs, data = plant_subset)
+
+plot(model7_log)
+
+check_normality(model7_log) #Warning: Non-normality of residuals detected (p = 0.002).
+
+check_heteroscedasticity(model7_log) #OK: Error variance appears to be homoscedastic (p = 0.370).
+
+```
+
+```{r}
+#using predictor num_phylls
+model8_log <- lm(log(totmass) ~num_phylls, data = plant_subset)
+
+plot(model8_log)
+
+check_normality(model8_log) #Warning: Non-normality of residuals detected (p = 0.028).
+
+check_heteroscedasticity(model8_log) #OK: Error variance appears to be homoscedastic (p = 0.138).
+```
+
+
+
+
+
+
+
+
+
+
+
+## some stuff to think about - kyle
+
+maybe if can do it by species?
